@@ -6,3 +6,6 @@ A Python program to track clipboard history and paste from history using custom 
 - Saves it to a JSON file
 - Lets you paste previous items with hotkeys. For example, ctrl + shift + 1 will paste the 2nd to last item you copied
 
+
+TODO:
+- Add support for images (it only works for text right now)
