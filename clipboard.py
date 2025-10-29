@@ -19,11 +19,13 @@ class Clipboard:
         self,
         filename: str = "clipboard.json",
         paste_keybind: str = "<ctrl>+<shift>",
+        type_keybind: str = "<shift>+<alt>",
     ):
         self.filename = filename
         self.content = self.load_content()
         self.last_text = pyperclip.paste()
         self.paste_keybind = paste_keybind
+        self.type_keybind = type_keybind
         self.disable = False
 
     # Load content from JSON
@@ -52,7 +54,7 @@ class Clipboard:
         self.save_content()
 
     """
-    The following code is for the clipboard:
+    The following code is for the clipboard (ctrl+v):
     """
 
     # Clipboard function
@@ -119,6 +121,45 @@ class Clipboard:
         with keyboard.GlobalHotKeys(hotkeys) as h:
             h.join()
 
+    """
+    The following code is for typing the clipboard text:
+    """
+
+    # Function to paste from JSON
+    def type_from_history(self, index):
+        history_index = -(index + 1)
+        # This is to make sure there are enough items in history
+        if len(self.content) >= (index + 1):
+            content_to_type = self.content[history_index]["content"]
+
+            def do_type():
+                try:
+                    self.disable = True
+                    pyperclip.copy(content_to_type)
+                    while pyperclip.paste() != content_to_type:
+                        time.sleep(0.01)
+                    print("geloo")
+                    keyboard_controller.type(content_to_type)
+                        
+                    pyperclip.copy(self.last_text)
+                except Exception as e:
+                    print(f"Error during typing thread: {e}")
+                finally:
+                    self.disable = False
+            threading.Thread(target=do_type, daemon=True).start()
+        else:
+            print("Index out of range")
+
+    # Start watching the keyboard
+    def watch_keyboard_typing(self):
+        typing_hotkeys = {}
+        for i in range(1, 11):  # Creates the hotkeys for the last 10 items copied
+            # Use the typing keybind (type_keybind) here
+            key = f"{self.type_keybind}+{i if i != 10 else 0}"
+            typing_hotkeys[key] = lambda i=i: self.type_from_history(i)
+        with keyboard.GlobalHotKeys(typing_hotkeys) as h:
+            h.join()
+
 
 # Creates the object
 
@@ -126,4 +167,12 @@ clipboard = Clipboard()
 
 if __name__ == "__main__":
     clipboard.watch_clipboard()
-    clipboard.watch_keyboard()
+    # Start both hotkey listeners in separate threads so both sets of hotkeys
+    # (paste and typing) are active at the same time.
+    t_paste = threading.Thread(target=clipboard.watch_keyboard, daemon=False)
+    t_type = threading.Thread(target=clipboard.watch_keyboard_typing, daemon=False)
+    t_paste.start()
+    t_type.start()
+    # Wait for both listeners (they block inside GlobalHotKeys.join())
+    t_paste.join()
+    t_type.join()
